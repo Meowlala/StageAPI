@@ -42,6 +42,9 @@ pit_sprite:Load("stageapi/pit.anm2", true)
 local decoration_sprite = Sprite()
 decoration_sprite:Load("gfx/grid/props_03_caves.anm2", true)
 
+local door_sprite = Sprite()
+door_sprite:Load("gfx/grid/door_01_normaldoor.anm2", true)
+
 local rockanimations = {"normal", "black", "tinted", "alt", "bombrock", "big", "superspecial", "ss_broken"}
 
 local function VectorToGrid(x,y)
@@ -165,11 +168,21 @@ function StageObject:setBackdrop(backdrop_data, anm2)
     self.BACKDROPANM2 = anm2 or "stageapi/Backdrop.anm2"
 end
 
-function StageObject:setRocks(path)
+function StageObject:setRocks(path, anm2)
+    if anm2 then
+        self.ROCKSPRITE = Sprite()
+        self.ROCKSPRITE:Load(anm2, true)
+    end
+
     self.ROCKS = path
 end
 
-function StageObject:setPits(path)
+function StageObject:setPits(path, anm2)
+    if anm2 then
+        self.PITSPRITE = Sprite()
+        self.PITSPRITE:Load(anm2, true)
+    end
+
     self.PITS = path
 end
 
@@ -189,17 +202,29 @@ function StageObject:setBossSpot(path)
     self.BOSSSPOT = path
 end
 
-function StageObject:setDecoration(path, animBegin)
+function StageObject:setDecoration(path, animBegin, anm2)
     animBegin = animBegin or "Prop"
+
+    local sprite
+    if anm2 then
+        sprite = Sprite()
+        sprite:Load(anm2, true)
+    end
+
     self.DECORATION = {
         FILE = path,
-        ANIM = animBegin
+        ANIM = animBegin,
+        SPRITE = sprite
     }
 end
 
-function StageObject:setDoors(anm2, sheet)
-    self.DOORSPRITE = StageAPI.GetDoorSprite(anm2)
-    if sheet then self.DOORSPRITE:ReplaceSpritesheet(0, sheet) end
+function StageObject:setDoors(sheet, anm2)
+    if anm2 then
+        self.DOORSPRITE = Sprite()
+        self.DOORSPRITE:Load(anm2, true)
+    end
+
+    self.DOORS = sheet
 end
 
 function StageObject:setTransitionIcon(path)
@@ -235,12 +260,6 @@ function StageAPI.getStageConfig(name, rooms, bossrooms, ismultistage)
 
     STAGES[#STAGES + 1] = inst
     return inst
-end
-
-function StageAPI.GetDoorSprite(anm2)
-    local doorSprite = Sprite()
-    doorSprite:Load(anm2)
-    return doorSprite
 end
 
 local backdrop_filenames = {
@@ -377,7 +396,6 @@ function StageAPI.getPitSprite(L, R, U, D, UL, DL, UR, DR)
     if D  then F = F | 8 end
 
     -- Then a bunch of other combinations
-    --
     if U and L and not UL and not R and not D then
         F = 17
     end
@@ -560,31 +578,45 @@ function StageAPI.ChangeRoomLayout(roomfile, Type)
 
                         local F = StageAPI.getPitSprite(L, R, U, D, UL, DL, UR, DR)
 
-                        if StageAPI.InNewStage() then
-                            for num=0, 4 do
-                                pit_sprite:ReplaceSpritesheet(num, stageProgression.Current.PITS or "gfx/grid/grid_pit.png")
+                        local spriteToUse = pit_sprite
+                        if stageProgression.Current then
+                            if stageProgression.Current.PITSPRITE then
+                                spriteToUse = stageProgression.Current.PITSPRITE
                             end
                         end
 
-                        pit_sprite:LoadGraphics()
-                        pit_sprite:SetFrame("pit", F)
+                        if StageAPI.InNewStage() then
+                            for num=0, 4 do
+                                spriteToUse:ReplaceSpritesheet(num, stageProgression.Current.PITS or "gfx/grid/grid_pit.png")
+                            end
+                        end
+
+                        spriteToUse:LoadGraphics()
+                        spriteToUse:SetFrame("pit", F)
 
                         grid.Sprite = pit_sprite
                     elseif grid:ToRock() then
+                        local spriteToUse = rock_sprite
+                        if stageProgression.Current then
+                            if stageProgression.Current.ROCKSPRITE then
+                                spriteToUse = stageProgression.Current.ROCKSPRITE
+                            end
+                        end
+
                         if StageAPI.InNewStage() then
                             for num=0, 4 do
-                                rock_sprite:ReplaceSpritesheet(num, stageProgression.Current.ROCKS or "gfx/grid/rocks_catacombs.png")
+                                spriteToUse:ReplaceSpritesheet(num, stageProgression.Current.ROCKS or "gfx/grid/rocks_catacombs.png")
                             end
                         end
 
                         for rock = 1, #rockanimations do
                             if grid.Sprite:IsPlaying(rockanimations[rock]) or grid.Sprite:IsFinished(rockanimations[rock]) then
-                                rock_sprite:SetFrame(rockanimations[rock], grid.Sprite:GetFrame())
+                                spriteToUse:SetFrame(rockanimations[rock], grid.Sprite:GetFrame())
                             end
                         end
 
-                        rock_sprite:LoadGraphics()
-                        grid.Sprite = rock_sprite
+                        spriteToUse:LoadGraphics()
+                        grid.Sprite = spriteToUse
                     end
                 end
             end
@@ -656,9 +688,10 @@ function StageAPI.ChangeBackdrop(backdrop_data, anm2)
 	end
 end
 
-function StageAPI.ChangeDoors(sprite)
+function StageAPI.ChangeDoors(FileNameDoor, sprite)
 	local room = AlphaAPI.GAME_STATE.ROOM
     if sprite then
+        sprite:ReplaceSpritesheet(0, FileNameDoor)
         for i=0, DoorSlot.NUM_DOOR_SLOTS-1 do
             local door = room:GetDoor(i)
             if door ~= nil then
@@ -677,14 +710,21 @@ function StageAPI.ChangePits(FileNamePit, FileNameBridge)
 	if TypeError("ChangeBridges", 1, "string", FileNamePit) and TypeError("ChangeBridges", 2, "string", FileNameBridge) then
 		for _, grid in ipairs(AlphaAPI.entities.grid) do
 			if grid:ToPit() then
-				pit_sprite:ReplaceSpritesheet(0, FileNamePit)
-				pit_sprite:SetFrame("pit", grid.Sprite:GetFrame())
+                local spriteToUse = pit_sprite
+                if stageProgression.Current then
+                    if stageProgression.Current.PITSPRITE then
+                        spriteToUse = stageProgression.Current.PITSPRITE
+                    end
+                end
+
+				spriteToUse:ReplaceSpritesheet(0, FileNamePit)
+				spriteToUse:SetFrame("pit", grid.Sprite:GetFrame())
 				if grid.State == 1 then
-					pit_sprite:ReplaceSpritesheet(1, FileNameBridge)
-					pit_sprite:SetOverlayFrame("Bridge", 0)
+					spriteToUse:ReplaceSpritesheet(1, FileNameBridge)
+					spriteToUse:SetOverlayFrame("Bridge", 0)
 				end
-				pit_sprite:LoadGraphics()
-				grid.Sprite = pit_sprite
+				spriteToUse:LoadGraphics()
+				grid.Sprite = spriteToUse
 			end
 		end
 	end
@@ -694,17 +734,25 @@ function StageAPI.ChangeRocks(FileName)
 	if TypeError("ChangeRocks", 1, "string", FileName) then
 		for _, grid in ipairs(AlphaAPI.entities.grid) do
 			if grid:ToRock() then
-				for num=0, 4 do
-					rock_sprite:ReplaceSpritesheet(num, FileName)
-				end
+                local spriteToUse = rock_sprite
+                if stageProgression.Current then
+                    if stageProgression.Current.ROCKSPRITE then
+                        spriteToUse = stageProgression.Current.ROCKSPRITE
+                    end
+                end
 
-				for rock=1, #rockanimations do
-					if grid.Sprite:IsPlaying(rockanimations[rock]) or grid.Sprite:IsFinished(rockanimations[rock]) then
-						rock_sprite:SetFrame(rockanimations[rock], grid.Sprite:GetFrame())
-					end
-				end
-				rock_sprite:LoadGraphics()
-				grid.Sprite = rock_sprite
+                for num=0, 4 do
+                    spriteToUse:ReplaceSpritesheet(num, rockFileName)
+                end
+
+                for rock = 1, #rockanimations do
+                    if grid.Sprite:IsPlaying(rockanimations[rock]) or grid.Sprite:IsFinished(rockanimations[rock]) then
+                        spriteToUse:SetFrame(rockanimations[rock], grid.Sprite:GetFrame())
+                    end
+                end
+
+                spriteToUse:LoadGraphics()
+                grid.Sprite = spriteToUse
 			end
 		end
 	end
@@ -713,33 +761,49 @@ end
 function StageAPI.ChangeGridEnts(rockFileName, pitFileName, decoData)
     for _, grid in ipairs(AlphaAPI.entities.grid) do
         if grid:ToPit() and pitFileName then
-            for num=0, 4 do
-                pit_sprite:ReplaceSpritesheet(num, pitFileName)
+            local spriteToUse = pit_sprite
+            if stageProgression.Current then
+                if stageProgression.Current.PITSPRITE then
+                    spriteToUse = stageProgression.Current.PITSPRITE
+                end
             end
-            pit_sprite:SetFrame("pit", grid.Sprite:GetFrame())
-            pit_sprite:LoadGraphics()
-            grid.Sprite = pit_sprite
-        elseif grid:ToRock() and rockFileName then
+
             for num=0, 4 do
-                rock_sprite:ReplaceSpritesheet(num, rockFileName)
+                spriteToUse:ReplaceSpritesheet(num, pitFileName)
+            end
+            spriteToUse:SetFrame("pit", grid.Sprite:GetFrame())
+            spriteToUse:LoadGraphics()
+            grid.Sprite = spriteToUse
+        elseif grid:ToRock() and rockFileName then
+            local spriteToUse = rock_sprite
+            if stageProgression.Current then
+                if stageProgression.Current.ROCKSPRITE then
+                    spriteToUse = stageProgression.Current.ROCKSPRITE
+                end
+            end
+
+            for num=0, 4 do
+                spriteToUse:ReplaceSpritesheet(num, rockFileName)
             end
 
             for rock = 1, #rockanimations do
                 if grid.Sprite:IsPlaying(rockanimations[rock]) or grid.Sprite:IsFinished(rockanimations[rock]) then
-                    rock_sprite:SetFrame(rockanimations[rock], grid.Sprite:GetFrame())
+                    spriteToUse:SetFrame(rockanimations[rock], grid.Sprite:GetFrame())
                 end
             end
 
-            rock_sprite:LoadGraphics()
-            grid.Sprite = rock_sprite
+            spriteToUse:LoadGraphics()
+            grid.Sprite = spriteToUse
         elseif grid:ToDecoration() and decoData and room:GetType() ~= RoomType.ROOM_DUNGEON then
-            decoration_sprite:ReplaceSpritesheet(0, decoData.FILE)
+            local spriteToUse = decoData.SPRITE or decoration_sprite
+
+            spriteToUse:ReplaceSpritesheet(0, decoData.FILE)
             rng:SetSeed(room:GetDecorationSeed())
             local rand = random(1,42)
             if rand < 10 then rand = "0"..tostring(rand) end
-            decoration_sprite:Play(decoData.ANIM..rand, true)
-            decoration_sprite:LoadGraphics()
-            grid.Sprite = decoration_sprite
+            spriteToUse:Play(decoData.ANIM..tostring(rand), true)
+            spriteToUse:LoadGraphics()
+            grid.Sprite = spriteToUse
         end
     end
 end
@@ -946,17 +1010,11 @@ function stageAPIMod:SettingUpStage2()
 end
 
 function stageAPIMod:OnNewRoom()
-	local game = AlphaAPI.GAME_STATE.GAME
-	local room = game:GetRoom()
-	local level = game:GetLevel()
-    local stage = level:GetStage()
+	local room = AlphaAPI.GAME_STATE.ROOM
+    local level = AlphaAPI.GAME_STATE.LEVEL
 
 	if StageAPI.InNewStage() then
         local curStage = stageProgression.Current
-
-        if room:IsFirstVisit() and room:GetType() == RoomType.ROOM_DEFAULT or room:GetType() == RoomType.ROOM_BOSS then
-
-        end
 
         if not (level:GetCurrentRoomIndex() == level:GetStartingRoomIndex() and room:IsFirstVisit()) then
     		if room:GetType() == RoomType.ROOM_DEFAULT or room:GetType() == RoomType.ROOM_TREASURE or room:GetType() == RoomType.ROOM_BOSS or room:GetType() == RoomType.ROOM_MINIBOSS then
@@ -964,7 +1022,7 @@ function stageAPIMod:OnNewRoom()
                     StageAPI.ChangeBackdrop(curStage.BACKDROPS, curStage.BACKDROPANM2)
     			end
 
-                StageAPI.ChangeDoors(curStage.DOORSPRITE)
+                StageAPI.ChangeDoors(curStage.DOORS or "gfx/grid/door_01_normaldoor.png", curStage.DOORSPRITE or door_sprite)
 
     			if room:IsFirstVisit() and room:GetType() == RoomType.ROOM_DEFAULT then
     				StageAPI.ChangeRoomLayout(curStage.ROOMS)
@@ -1021,13 +1079,9 @@ function stageAPIMod:OnNewRoom()
 end
 
 function stageAPIMod:OnNewLevel()
-	local game = AlphaAPI.GAME_STATE.GAME
-	local level = AlphaAPI.GAME_STATE.LEVEL
-    local stage = level:GetStage()
-
     stageProgression.Current = nil
 
-	if level:GetStageType() == StageType.STAGETYPE_WOTL and (stage == LevelStage.STAGE2_2 or stage == LevelStage.STAGE2_1) then
+	if StageAPI.InNewStage() then
         for _, player in pairs(AlphaAPI.GAME_STATE.PLAYERS) do
             if player.Variant == 0 then
                 player:AnimateAppear()
