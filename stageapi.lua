@@ -927,8 +927,8 @@ function stageAPIMod:SettingUpStage2()
 
             if sprite:IsPlaying("Trapdoor") and sprite:GetFrame() == 15 and trapdoorFound then
                 trapdoorFound = false
-                sprite:Stop()
                 player.SpriteOffset = VECTOR_ZERO
+                sprite:Stop()
                 if stageProgression.Next:IsInStage() or not stageProgression.Next.ISMULTISTAGE then
                     stageProgression.Next:MoveToStage(2)
                 else
