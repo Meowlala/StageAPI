@@ -295,39 +295,6 @@ local backdrop_filenames = {
     }
 }
 
-    {
-        {
-            NFLOORS = {
-                "nfloor1.png"
-            },
-            LFLOORS = {
-                "lfloor1.png"
-            },
-            CORNERS = {
-                "corner1.png"
-            },
-            WALLS = {
-                "wall1_1.png",
-                "wall1_2.png"
-            }
-        },
-        {
-            NFLOORS = {
-                "nfloor2.png"
-            },
-            LFLOORS = {
-                "lfloor2.png"
-            },
-            CORNERS = {
-                "corner2.png"
-            },
-            WALLS = {
-                "wall2_1.png",
-                "wall2_2.png"
-            }
-        }
-    }
-
 local catacomb_rooms = require("catacombs.lua")
 local catacomb_boss_rooms = require("catacombsbosses.lua")
 local catacombs_stage = StageAPI.getStageConfig("Catacombs", catacomb_rooms, catacomb_boss_rooms, false)
