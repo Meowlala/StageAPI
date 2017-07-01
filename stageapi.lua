@@ -147,6 +147,10 @@ function StageObject:_init(name, rooms, bossrooms, isMultiStage)
     self.ISMULTISTAGE = isMultiStage
 end
 
+function StageObject:IsInStage()
+    return stageProgression.Current and stageProgression.Current.NAME == self.NAME
+end
+
 function StageObject:SetRooms(rooms)
     self.ROOMS = rooms
 end
@@ -297,20 +301,20 @@ local backdrop_filenames = {
 
 local catacomb_rooms = require("catacombs.lua")
 local catacomb_boss_rooms = require("catacombsbosses.lua")
-local catacombs_stage = StageAPI.getStageConfig("Catacombs", catacomb_rooms, catacomb_boss_rooms, false)
+local catacombs_stage = StageAPI.GetStageConfig("Catacombs", catacomb_rooms, catacomb_boss_rooms, false)
 
-catacombs_stage:setTransitionIcon("stageapi/LevelIcon.png")
+catacombs_stage:SetTransitionIcon("stageapi/LevelIcon.png")
 
-catacombs_stage:setNameSprite("stageapi/effect_catacombs1_streak.png", "stageapi/effect_catacombs2_streak.png")
-catacombs_stage:setBackdrop(getBackdropData(backdrop_filenames))
+catacombs_stage:SetNameSprite("stageapi/effect_catacombs1_streak.png", "stageapi/effect_catacombs2_streak.png")
+catacombs_stage:SetBackdrop(getBackdropData(backdrop_filenames))
 
-catacombs_stage:setBridges("gfx/grid/grid_bridge_catacombs.png")
-catacombs_stage:setPits("gfx/grid/grid_pit_catacombs.png")
-catacombs_stage:setRocks("gfx/grid/rocks_catacombs.png")
+catacombs_stage:SetBridges("gfx/grid/grid_bridge_catacombs.png")
+catacombs_stage:SetPits("gfx/grid/grid_pit_catacombs.png")
+catacombs_stage:SetRocks("gfx/grid/rocks_catacombs.png")
 
-catacombs_stage:setMusic(Music.MUSIC_CATACOMBS)
+catacombs_stage:SetMusic(Music.MUSIC_CATACOMBS)
 
-catacombs_stage:setBossSpot("gfx/ui/boss/bossspot_04_catacombs.png")
+catacombs_stage:SetBossSpot("gfx/ui/boss/bossspot_04_catacombs.png")
 
 local bosses = {
     {EntityType.ENTITY_GURGLING, "turdlings", 2},
@@ -351,7 +355,7 @@ local bosses = {
 }
 
 for _, bossdata in ipairs(bosses) do
-    catacombs_stage:setBossPortrait(bossdata[1], "gfx/ui/boss/portrait_" .. bossdata[2] .. ".png", "gfx/ui/boss/bossname_" .. bossdata[2] .. ".png", bossdata[3], bossdata[4])
+    catacombs_stage:SetBossPortrait(bossdata[1], "gfx/ui/boss/portrait_" .. bossdata[2] .. ".png", "gfx/ui/boss/bossname_" .. bossdata[2] .. ".png", bossdata[3], bossdata[4])
 end
 
 local gridData = {
@@ -825,20 +829,20 @@ function Overlay:_init(anm2, velocity, offset, position)
     sprite:Play("Idle")
 
     self.Sprite = sprite
-    self.Position = position or ZERO_VECTOR
-    self.Offset = offset or ZERO_VECTOR
-    self.Velocity = velocity or ZERO_VECTOR
+    self.Position = position or VECTOR_ZERO
+    self.Offset = offset or VECTOR_ZERO
+    self.Velocity = velocity or VECTOR_ZERO
 end
 
 function Overlay:Render()
-    local overlayoffset = ZERO_VECTOR
+    local overlayoffset = VECTOR_ZERO
     self.Position = self.Position + self.Velocity
     overlayoffset = self.Position
     if overlayoffset.X < 0 then self.Position = Vector(overlayoffset.X+512, overlayoffset.Y) end
     if overlayoffset.Y < 0 then self.Position = Vector(overlayoffset.X, overlayoffset.Y+512) end
     if overlayoffset.X > 512 then self.Position = Vector(overlayoffset.X-512, overlayoffset.Y) end
     if overlayoffset.Y > 512 then self.Position = Vector(overlayoffset.X, overlayoffset.Y-512) end
-    overlay.Sprite:Render(self.Position + overlay.Offset, ZERO_VECTOR, ZERO_VECTOR)
+    overlay.Sprite:Render(self.Position + overlay.Offset, VECTOR_ZERO, VECTOR_ZERO)
 end
 
 function StageAPI.AddOverlay(anm2, velocity, offset, position)
@@ -899,11 +903,39 @@ end
 local music = MusicManager()
 local updateTick = false
 local wait = 0
+local trapdoorFound
 
 function stageAPIMod:SettingUpStage2()
-    for _, grid in ipairs(AlphaAPI.entities.grid) do
-        if grid:ToPit() then
-            AlphaAPI.gridLog(grid, grid.Sprite:GetFrame())
+    stageProgression.Next = catacombs_stage
+    for _, player in ipairs(AlphaAPI.GAME_STATE.PLAYERS) do
+        if stageProgression.Next then
+            local sprite = player:GetSprite()
+
+            if not trapdoorFound then
+                for _, grid in ipairs(AlphaAPI.entities.grid) do
+                    if grid:ToTrapdoor() and player.Position:Distance(grid.Position) < player.Size + 32 then
+                        if not sprite:IsPlaying("Trapdoor") and not transition:IsPlaying("Scene") then
+                            player:AnimateTrapdoor()
+                            player.SpriteOffset = (grid.Position - player.Position)
+                            --player.SpriteOffset.X = player.SpriteOffset.X - player.Size / 2
+                            player.Velocity = VECTOR_ZERO
+                            player.ControlsEnabled = false
+                            trapdoorFound = true
+                        end
+                    end
+                end
+            end
+
+            if sprite:IsPlaying("Trapdoor") and sprite:GetFrame() == 15 and trapdoorFound then
+                trapdoorFound = false
+                sprite:Stop()
+                player.SpriteOffset = VECTOR_ZERO
+                if stageProgression.Next:IsInStage() or not stageProgression.Next.ISMULTISTAGE then
+                    stageProgression.Next:MoveToStage(2)
+                else
+                    stageProgression.Next:MoveToStage(1)
+                end
+            end
         end
     end
 
@@ -911,7 +943,7 @@ function stageAPIMod:SettingUpStage2()
         local game = AlphaAPI.GAME_STATE.GAME
         local room = AlphaAPI.GAME_STATE.ROOM
         local level = AlphaAPI.GAME_STATE.LEVEL
-        local player = Isaac.GetPlayer(0)
+        local player = AlphaAPI.GAME_STATE.PLAYERS[1]
 
         local curStage = stageProgression.Current
 
