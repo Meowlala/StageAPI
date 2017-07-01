@@ -906,11 +906,9 @@ local wait = 0
 local trapdoorFound
 
 function stageAPIMod:SettingUpStage2()
-    stageProgression.Next = catacombs_stage
     for _, player in ipairs(AlphaAPI.GAME_STATE.PLAYERS) do
         if stageProgression.Next then
             local sprite = player:GetSprite()
-
             if not trapdoorFound then
                 for _, grid in ipairs(AlphaAPI.entities.grid) do
                     if grid:ToTrapdoor() and player.Position:Distance(grid.Position) < player.Size + 32 then
