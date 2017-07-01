@@ -22,6 +22,10 @@ end
 
 local VECTOR_ZERO = Vector(0, 0)
 
+local transition = Sprite()
+transition:Load("stageapi/customnightmare.anm2", true)
+transition:Play("Idle", true)
+
 local namestreak = Sprite()
 namestreak:Load("gfx/ui/ui_streak.anm2", true)
 namestreak:Play("TextStay", true)
@@ -97,24 +101,40 @@ end
 
 local CUSTOM_OVERLAYS = {}
 local STAGES = {}
+local stageProgression = {
+    Current = nil,
+    Set = nil,
+    Next = nil
+}
+
+
 local StageObject = {}
 
-function StageObject:moveToStage()
-    local game = AlphaAPI.GAME_STATE.GAME
-    local level = AlphaAPI.GAME_STATE.LEVEL
+function StageObject:moveToStage(floor)
+    if not floor then
+        if self.ISMULTISTAGE then
+            floor = 1
+        else
+            floor = 2
+        end
+    end
 
-    if self.isMultiStage then
+    for _, player in ipairs(AlphaAPI.GAME_STATE.PLAYERS) do
+        player.ControlsEnabled = false
+    end
+
+    if floor == 1 then
         stageProgression.Set = self
         stageProgression.Next = self
-        level:SetStage(LevelStage.STAGE2_1, StageType.STAGETYPE_WOTL)
+        Isaac.ExecuteCommand("stage 3a")
     else
         stageProgression.Set = self
         stageProgression.Next = nil
-        level:SetStage(LevelStage.STAGE2_2, StageType.STAGETYPE_WOTL)
+        Isaac.ExecuteCommand("stage 4a")
     end
 
-    rng:SetSeed(room:GetSpawnSeed())
-    game:StartStageTransition(true, random(13))
+    transition:ReplaceSpritesheet(2, self.TRANSITIONICON or "stageapi/LevelIcon.png")
+    transition:Play("Scene")
 end
 
 function StageObject:_init(name, rooms, bossrooms, isMultiStage)
@@ -142,7 +162,7 @@ end
 
 function StageObject:setBackdrop(backdrop_data, anm2)
     self.BACKDROPS = backdrop_data
-    self.BACKDROPANM2 = anm2 or "gfx/backdrop/Backdrop.anm2"
+    self.BACKDROPANM2 = anm2 or "stageapi/Backdrop.anm2"
 end
 
 function StageObject:setRocks(path)
@@ -182,6 +202,10 @@ function StageObject:setDoors(anm2, sheet)
     if sheet then self.DOORSPRITE:ReplaceSpritesheet(0, sheet) end
 end
 
+function StageObject:setTransitionIcon(path)
+    self.TRANSITIONICON = path
+end
+
 function StageObject:setBossPortrait(bossType, portraitFile, nameFile, bossVariant, bossSubtype, priority)
     if not bossType or not portraitFile then error("StageObject:SetBossPortrait requires an EntityType, a Portrait PNG file, and a Boss Name PNG file.", 2) end
     if not self.BOSSDATA then
@@ -208,6 +232,8 @@ function StageAPI.getStageConfig(name, rooms, bossrooms, ismultistage)
     local inst = {}
     setmetatable(inst, {__index = StageObject})
     inst:_init(name, rooms, bossrooms, ismultistage)
+
+    STAGES[#STAGES + 1] = inst
     return inst
 end
 
@@ -253,6 +279,8 @@ local backdrop_filenames = {
 local catacomb_rooms = require("catacombs.lua")
 local catacomb_boss_rooms = require("catacombsbosses.lua")
 local catacombs_stage = StageAPI.getStageConfig("Catacombs", catacomb_rooms, catacomb_boss_rooms, false)
+
+catacombs_stage:setTransitionIcon("stageapi/LevelIcon.png")
 
 catacombs_stage:setNameSprite("stageapi/effect_catacombs1_streak.png", "stageapi/effect_catacombs2_streak.png")
 catacombs_stage:setBackdrop(getBackdropData(backdrop_filenames))
@@ -306,12 +334,6 @@ local bosses = {
 for _, bossdata in ipairs(bosses) do
     catacombs_stage:setBossPortrait(bossdata[1], "gfx/ui/boss/portrait_" .. bossdata[2] .. ".png", "gfx/ui/boss/bossname_" .. bossdata[2] .. ".png", bossdata[3], bossdata[4])
 end
-
-local stageProgression = {
-    Current = nil,
-    Set = nil,
-    Next = nil
-}
 
 local gridData = {
 
@@ -786,7 +808,7 @@ function StageAPI.InNewStage()
     return (stage == LevelStage.STAGE2_1 or stage == LevelStage.STAGE2_2) and AlphaAPI.GAME_STATE.LEVEL:GetStageType() == StageType.STAGETYPE_WOTL
 end
 
-function StageAPI:SettingUpStage1()
+function stageAPIMod:SettingUpStage1()
     for _, overlay in ipairs(CUSTOM_OVERLAYS) do
         overlay.Sprite:Update()
         overlay.Sprite:LoadGraphics()
@@ -807,16 +829,13 @@ function StageAPI:SettingUpStage1()
 			grid.Sprite = pit_sprite
 		end
 	end
-
-	if namestreak:IsFinished("Text") then
-        namestreak:Play("TextStay")
-    end
 end
 
 local music = MusicManager()
 local updateTick = false
+local wait = 0
 
-function StageAPI:SettingUpStage2()
+function stageAPIMod:SettingUpStage2()
     for _, grid in ipairs(AlphaAPI.entities.grid) do
         if grid:ToPit() then
             AlphaAPI.gridLog(grid, grid.Sprite:GetFrame())
@@ -838,11 +857,15 @@ function StageAPI:SettingUpStage2()
                 namestreak:Update()
             end
 
+            if namestreak:IsFinished("Text") then
+                namestreak:Play("TextStay")
+            end
+
             namestreak:Render(AlphaAPI.getScreenCenterPosition()+Vector(0,-80), VECTOR_ZERO, VECTOR_ZERO)
         end
 
         if bossanim:IsPlaying("Scene") then
-            if Input.IsActionPressed(ButtonAction.ACTION_MENUCONFIRM, player.ControllerIndex) then
+            if Input.IsActionPressed(ButtonAction.ACTION_MENUCONFIRM, player.ControllerIndex) or bossanim:IsFinished("Scene") then
                 bossanim:Stop()
             end
 
@@ -851,6 +874,34 @@ function StageAPI:SettingUpStage2()
             end
 
             bossanim:Render(AlphaAPI.getScreenCenterPosition(), VECTOR_ZERO, VECTOR_ZERO)
+        end
+
+        if wait > 0 then wait = wait - 1 end
+
+        if transition:IsPlaying("Scene") then
+            if updateTick then
+                transition:Update()
+            end
+
+            if (wait <= 0 and Input.IsActionTriggered(ButtonAction.ACTION_MENUCONFIRM, player.ControllerIndex)) or transition:IsFinished("Scene") then
+                transition:Stop()
+                transition:Play("Idle")
+
+                if level:GetStage() == LevelStage.STAGE2_1 and curStage.NAMESPRITE.FLOOR1 ~= nil then
+                    namestreak:ReplaceSpritesheet(0, curStage.NAMESPRITE.FLOOR1)
+                elseif level:GetStage() == LevelStage.STAGE2_2 and curStage.NAMESPRITE.FLOOR2 ~= nil then
+                    namestreak:ReplaceSpritesheet(0, curStage.NAMESPRITE.FLOOR2)
+                end
+
+                namestreak:ReplaceSpritesheet(1, "stageapi/none.png")
+                namestreak:Play("Text")
+
+                for _, player in ipairs(AlphaAPI.GAME_STATE.PLAYERS) do
+                    player.ControlsEnabled = true
+                end
+            end
+
+            transition:Render(AlphaAPI.getScreenCenterPosition(), VECTOR_ZERO, VECTOR_ZERO)
         end
 
 		local musicid = curStage.MUSIC
@@ -883,17 +934,6 @@ function StageAPI:SettingUpStage2()
             end
 		end
 
-        if level:GetCurrentRoomIndex() == level:GetStartingRoomIndex() and room:IsFirstVisit() and room:GetFrameCount() <= 1 then
-            if level:GetStage() == LevelStage.STAGE2_1 and curStage.NAMESPRITE.FLOOR1 ~= nil then
-                namestreak:ReplaceSpritesheet(0, curStage.NAMESPRITE.FLOOR1)
-            elseif level:GetStage() == LevelStage.STAGE2_2 and curStage.NAMESPRITE.FLOOR2 ~= nil then
-                namestreak:ReplaceSpritesheet(0, curStage.NAMESPRITE.FLOOR2)
-            end
-
-            namestreak:ReplaceSpritesheet(1, "gfx/ui/none.png")
-            namestreak:Play("Text")
-        end
-
         if room:GetType() == RoomType.ROOM_BOSS and not room:IsClear() then
             local musicid = curStage.BOSSMUSIC or Music.MUSIC_BOSS
             if musicid and music:GetCurrentMusicID() ~= musicid then
@@ -905,7 +945,7 @@ function StageAPI:SettingUpStage2()
 	end
 end
 
-function StageAPI:OnNewRoom()
+function stageAPIMod:OnNewRoom()
 	local game = AlphaAPI.GAME_STATE.GAME
 	local room = game:GetRoom()
 	local level = game:GetLevel()
@@ -980,7 +1020,7 @@ function StageAPI:OnNewRoom()
 	end
 end
 
-function StageAPI:OnNewLevel()
+function stageAPIMod:OnNewLevel()
 	local game = AlphaAPI.GAME_STATE.GAME
 	local level = AlphaAPI.GAME_STATE.LEVEL
     local stage = level:GetStage()
@@ -1007,8 +1047,28 @@ function StageAPI:OnNewLevel()
 	end
 end
 
-stageAPIMod:AddCallback(ModCallbacks.MC_POST_UPDATE, StageAPI.SettingUpStage1)
-stageAPIMod:AddCallback(ModCallbacks.MC_POST_RENDER, StageAPI.SettingUpStage2)
+function stageAPIMod:ExecuteCommand(command, params)
+    if command == "customstage" or command == "cstage" then
+        local moved = false
+        for _, stage in pairs(STAGES) do
+            if string.lower(stage.NAME) == string.lower(params) then
+                stage:moveToStage()
+                Isaac.ConsoleOutput("Moving to stage " .. stage.NAME)
+                moved = true
+                wait = 60
+                break
+            end
+        end
 
-api_mod:addCallback(AlphaAPI.Callbacks.ROOM_CHANGED, StageAPI.OnNewRoom)
-api_mod:addCallback(AlphaAPI.Callbacks.FLOOR_CHANGED, StageAPI.OnNewLevel)
+        if not moved then
+            Isaac.ConsoleOutput("Could not find stage " .. params .. " to move to.")
+        end
+    end
+end
+
+stageAPIMod:AddCallback(ModCallbacks.MC_EXECUTE_CMD, stageAPIMod.ExecuteCommand)
+stageAPIMod:AddCallback(ModCallbacks.MC_POST_UPDATE, stageAPIMod.SettingUpStage1)
+stageAPIMod:AddCallback(ModCallbacks.MC_POST_RENDER, stageAPIMod.SettingUpStage2)
+
+api_mod:addCallback(AlphaAPI.Callbacks.ROOM_CHANGED, stageAPIMod.OnNewRoom)
+api_mod:addCallback(AlphaAPI.Callbacks.FLOOR_CHANGED, stageAPIMod.OnNewLevel)
