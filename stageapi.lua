@@ -872,6 +872,10 @@ function StageAPI.GetCurrentStage()
 	return stageProgression.Current
 end
 
+function StageAPI.SetNextStage(stage)
+    stageProgression.Next = stage
+end
+
 function StageAPI.InNewStage()
     local stage = AlphaAPI.GAME_STATE.LEVEL:GetStage()
     return (stage == LevelStage.STAGE2_1 or stage == LevelStage.STAGE2_2) and AlphaAPI.GAME_STATE.LEVEL:GetStageType() == StageType.STAGETYPE_WOTL
