@@ -914,10 +914,9 @@ function stageAPIMod:SettingUpStage2()
             if not trapdoorFound then
                 for _, grid in ipairs(AlphaAPI.entities.grid) do
                     if grid:ToTrapdoor() and player.Position:Distance(grid.Position) < player.Size + 32 then
-                        if not sprite:IsPlaying("Trapdoor") and not transition:IsPlaying("Scene") then
+                        if not sprite:IsPlaying("Trapdoor") and not transition:IsPlaying("Scene") and grid.Sprite:IsFinished("Opened") then
                             player:AnimateTrapdoor()
-                            player.SpriteOffset = (grid.Position - player.Position)
-                            --player.SpriteOffset.X = player.SpriteOffset.X - player.Size / 2
+                            player.PositionOffset = (-player.Position) + grid.Position
                             player.Velocity = VECTOR_ZERO
                             player.ControlsEnabled = false
                             trapdoorFound = true
