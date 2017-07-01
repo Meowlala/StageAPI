@@ -910,6 +910,7 @@ local wait = 0
 local trapdoorFound
 
 function stageAPIMod:SettingUpStage2()
+    stageProgression.Next = catacombs_stage
     for _, player in ipairs(AlphaAPI.GAME_STATE.PLAYERS) do
         if stageProgression.Next then
             local sprite = player:GetSprite()
@@ -917,8 +918,8 @@ function stageAPIMod:SettingUpStage2()
                 for _, grid in ipairs(AlphaAPI.entities.grid) do
                     if grid:ToTrapdoor() and player.Position:Distance(grid.Position) < player.Size + 32 then
                         if not sprite:IsPlaying("Trapdoor") and not transition:IsPlaying("Scene") and grid.Sprite:IsFinished("Opened") then
+                            player:SetTargetTrapDoor(grid)
                             player:AnimateTrapdoor()
-                            player.PositionOffset = (-player.Position) + grid.Position
                             player.Velocity = VECTOR_ZERO
                             player.ControlsEnabled = false
                             trapdoorFound = true
@@ -929,7 +930,6 @@ function stageAPIMod:SettingUpStage2()
 
             if sprite:IsPlaying("Trapdoor") and sprite:GetFrame() == 15 and trapdoorFound then
                 trapdoorFound = false
-                player.SpriteOffset = VECTOR_ZERO
                 sprite:Stop()
                 if stageProgression.Next:IsInStage() or not stageProgression.Next.ISMULTISTAGE then
                     stageProgression.Next:MoveToStage(2)
