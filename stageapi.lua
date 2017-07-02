@@ -145,6 +145,43 @@ function StageObject:_init(name, rooms, bossrooms, isMultiStage)
     self.ROOMS = rooms
     self.BOSSROOMS = bossrooms
     self.ISMULTISTAGE = isMultiStage
+    self.ROCKCHANCES = {
+        {
+            TYPE = GridEntityType.GRID_ROCKT,
+            CHANCE = nil
+        },
+        {
+            TYPE = GridEntityType.GRID_ROCK_BOMB,
+            CHANCE = nil
+        },
+        {
+            TYPE = GridEntityType.GRID_ROCK_SS,
+            CHANCE = nil
+        }
+    }
+end
+
+function StageObject:SetRockReplaceChance(replaceType, chance)
+    local addNew = true
+    for i, rockChance in ipairs(self.ROCKCHANCES) do
+        if replaceType == rockChance.TYPE then
+            self.ROCKCHANCES[i].CHANCE = chance
+            addNew = false
+        end
+    end
+
+    if addNew then
+        self.ROCKCHANCES[#self.ROCKCHANCES + 1] = {
+            TYPE = replaceType,
+            CHANCE = chance
+        }
+    end
+end
+
+function StageObject:UseDefaultRockReplaceChances()
+    self:SetRockReplaceChance(GridEntityType.GRID_ROCKT, 32)
+    self:SetRockReplaceChance(GridEntityType.GRID_ROCK_BOMB, 32)
+    self:SetRockReplaceChance(GridEntityType.GRID_ROCK_SS, 48)
 end
 
 function StageObject:IsInStage()
@@ -303,6 +340,7 @@ local catacomb_rooms = require("catacombs.lua")
 local catacomb_boss_rooms = require("catacombsbosses.lua")
 local catacombs_stage = StageAPI.GetStageConfig("Catacombs", catacomb_rooms, catacomb_boss_rooms, false)
 
+catacombs_stage:UseDefaultRockReplaceChances()
 catacombs_stage:SetTransitionIcon("stageapi/LevelIcon.png")
 
 catacombs_stage:SetNameSprite("stageapi/effect_catacombs1_streak.png", "stageapi/effect_catacombs2_streak.png")
@@ -362,21 +400,23 @@ local gridData = {
 
 }
 
-function StageAPI.ClearRoomLayout()
+function StageAPI.ClearRoomLayout(ignoreGrids)
 	for _, entity in ipairs(AlphaAPI.entities.all) do
 		if entity.Type ~= EntityType.ENTITY_PLAYER and entity.Type ~= EntityType.ENTITY_FAMILIAR and entity.Type ~= EntityType.ENTITY_KNIFE and not (entity.Type == 1000 and (entity.Variant == 82 or entity.Variant == 8)) then
             entity:Remove()
         end
 	end
 
-    for _, grid in ipairs(AlphaAPI.entities.grid) do
-        if not grid:ToDoor() and not grid:ToWall() and not grid:ToDecoration() then
-            local index = grid:GetGridIndex()
-            AlphaAPI.callDelayed(function()
-                if not gridData[index] then
-                    AlphaAPI.GAME_STATE.ROOM:RemoveGridEntity(index, 0, false)
-                end
-            end, 1, true)
+    if not ignoreGrids then
+        for _, grid in ipairs(AlphaAPI.entities.grid) do
+            if not grid:ToDoor() and not grid:ToWall() and not grid:ToDecoration() then
+                local index = grid:GetGridIndex()
+                AlphaAPI.callDelayed(function()
+                    if not gridData[index] then
+                        AlphaAPI.GAME_STATE.ROOM:RemoveGridEntity(index, 0, false)
+                    end
+                end, 1, true)
+            end
         end
     end
 end
@@ -467,7 +507,7 @@ function StageAPI.getPitSprite(L, R, U, D, UL, DL, UR, DR)
     return F
 end
 
-function StageAPI.ChangeRoomLayout(roomfile, Type)
+function StageAPI.ChangeRoomLayout(roomfile, Type, ignoreGrids)
 	if TypeError("ChangeRoomLayout", 1, "table", roomfile) then
 		local game = Game()
 		local room = game:GetRoom()
@@ -526,6 +566,8 @@ function StageAPI.ChangeRoomLayout(roomfile, Type)
             rng:SetSeed(room:GetSpawnSeed(), 1)
             local chosen = good_rooms[random(#good_rooms)]
 
+            Isaac.DebugString( "[StageAPI] Room of type " .. tostring(chosen.TYPE) .. " and variant " .. tostring(chosen.VARIANT) )
+
             local grids_spawned = {}
             local ents_spawned = {}
 
@@ -548,79 +590,91 @@ function StageAPI.ChangeRoomLayout(roomfile, Type)
                             VECTOR_ZERO,
                             nil
                         )
+                        if npc:CanShutDoors() then room:SetClear(false) end
                         ents_spawned[#ents_spawned + 1] = npc
-						if npc:CanShutDoors() then
-							room:SetClear(false)
-							for num=0, 7 do
-								if room:GetDoor(num) ~= nil then
-									room:GetDoor(num):Close(true)
-								end
-							end
-						end
 					end
 				end
 			end
 
             gridData = {}
-            for key, griddata in pairs(grid_map) do
-                local grid = Isaac.GridSpawn(griddata.TYPE, griddata.VARIANT, room:GetGridPosition(VectorToGrid(griddata.GRIDX, griddata.GRIDY)), true)
-                gridData[grid:GetGridIndex()] = true
-                grids_spawned[#grids_spawned + 1] = grid
-                if grid then
-                    grid:Init(room:GetDecorationSeed())
-                    grid:Update()
-                    if grid:ToPit() then
-                        -- Words were shortened to make writing code simpler.
-                        local L = isPit(grid_map, griddata.GRIDX - 1, griddata.GRIDY) -- Left Pit
-                        local R = isPit(grid_map, griddata.GRIDX + 1, griddata.GRIDY) -- Right Pit
-                        local U = isPit(grid_map, griddata.GRIDX, griddata.GRIDY - 1) -- Up Pit
-                        local D = isPit(grid_map, griddata.GRIDX, griddata.GRIDY + 1) -- Down Pit
-                        local UL = isPit(grid_map, griddata.GRIDX - 1, griddata.GRIDY - 1) -- Up Left Pit
-                        local DL = isPit(grid_map, griddata.GRIDX - 1, griddata.GRIDY + 1) -- Down Left Pit
-                        local UR = isPit(grid_map, griddata.GRIDX + 1, griddata.GRIDY - 1) -- Up Right Pit
-                        local DR = isPit(grid_map, griddata.GRIDX + 1, griddata.GRIDY + 1) -- Down Right Pit
+            if not ignoreGrids then
+                for key, griddata in pairs(grid_map) do
+                    local index = VectorToGrid(griddata.GRIDX, griddata.GRIDY)
+                    -- Room of type 1 and variant 88
+                    room:RemoveGridEntity(index, 0, true)
 
-                        local F = StageAPI.getPitSprite(L, R, U, D, UL, DL, UR, DR)
-
-                        local spriteToUse = pit_sprite
-                        if stageProgression.Current then
-                            if stageProgression.Current.PITSPRITE then
-                                spriteToUse = stageProgression.Current.PITSPRITE
+                    if griddata.TYPE == GridEntityType.GRID_ROCK then
+                        if stageProgression.Current and stageProgression.Current.ROCKCHANCES then
+                            for _, rockChance in ipairs(stageProgression.Current.ROCKCHANCES) do
+                                if random(0, rockChance.CHANCE) == 0 then
+                                    griddata.TYPE = rockChance.TYPE
+                                    break
+                                end
                             end
+                        elseif not stageProgression.Current and index == room:GetTintedRockIdx() then
+                            griddata.TYPE = GridEntityType.GRID_ROCKT
                         end
+                    end
 
-                        if StageAPI.InNewStage() then
-                            for num=0, 4 do
-                                spriteToUse:ReplaceSpritesheet(num, stageProgression.Current.PITS or "gfx/grid/grid_pit.png")
+                    local grid = Isaac.GridSpawn(griddata.TYPE, griddata.VARIANT, room:GetGridPosition(index), true)
+                    gridData[grid:GetGridIndex()] = true
+                    grids_spawned[#grids_spawned + 1] = grid
+                    if grid then
+                        grid:Init(room:GetDecorationSeed())
+                        grid:Update()
+                        if grid:ToPit() then
+                            -- Words were shortened to make writing code simpler.
+                            local L = isPit(grid_map, griddata.GRIDX - 1, griddata.GRIDY) -- Left Pit
+                            local R = isPit(grid_map, griddata.GRIDX + 1, griddata.GRIDY) -- Right Pit
+                            local U = isPit(grid_map, griddata.GRIDX, griddata.GRIDY - 1) -- Up Pit
+                            local D = isPit(grid_map, griddata.GRIDX, griddata.GRIDY + 1) -- Down Pit
+                            local UL = isPit(grid_map, griddata.GRIDX - 1, griddata.GRIDY - 1) -- Up Left Pit
+                            local DL = isPit(grid_map, griddata.GRIDX - 1, griddata.GRIDY + 1) -- Down Left Pit
+                            local UR = isPit(grid_map, griddata.GRIDX + 1, griddata.GRIDY - 1) -- Up Right Pit
+                            local DR = isPit(grid_map, griddata.GRIDX + 1, griddata.GRIDY + 1) -- Down Right Pit
+
+                            local F = StageAPI.getPitSprite(L, R, U, D, UL, DL, UR, DR)
+
+                            local spriteToUse = pit_sprite
+                            if stageProgression.Current then
+                                if stageProgression.Current.PITSPRITE then
+                                    spriteToUse = stageProgression.Current.PITSPRITE
+                                end
                             end
-                        end
 
-                        spriteToUse:LoadGraphics()
-                        spriteToUse:SetFrame("pit", F)
-
-                        grid.Sprite = pit_sprite
-                    elseif grid:ToRock() then
-                        local spriteToUse = rock_sprite
-                        if stageProgression.Current then
-                            if stageProgression.Current.ROCKSPRITE then
-                                spriteToUse = stageProgression.Current.ROCKSPRITE
+                            if StageAPI.InNewStage() then
+                                for num=0, 4 do
+                                    spriteToUse:ReplaceSpritesheet(num, stageProgression.Current.PITS or "gfx/grid/grid_pit.png")
+                                end
                             end
-                        end
 
-                        if StageAPI.InNewStage() then
-                            for num=0, 4 do
-                                spriteToUse:ReplaceSpritesheet(num, stageProgression.Current.ROCKS or "gfx/grid/rocks_catacombs.png")
+                            spriteToUse:LoadGraphics()
+                            spriteToUse:SetFrame("pit", F)
+
+                            grid.Sprite = pit_sprite
+                        elseif grid:ToRock() then
+                            local spriteToUse = rock_sprite
+                            if stageProgression.Current then
+                                if stageProgression.Current.ROCKSPRITE then
+                                    spriteToUse = stageProgression.Current.ROCKSPRITE
+                                end
                             end
-                        end
 
-                        for rock = 1, #rockanimations do
-                            if grid.Sprite:IsPlaying(rockanimations[rock]) or grid.Sprite:IsFinished(rockanimations[rock]) then
-                                spriteToUse:SetFrame(rockanimations[rock], grid.Sprite:GetFrame())
+                            if StageAPI.InNewStage() then
+                                for num=0, 4 do
+                                    spriteToUse:ReplaceSpritesheet(num, stageProgression.Current.ROCKS or "gfx/grid/rocks_catacombs.png")
+                                end
                             end
-                        end
 
-                        spriteToUse:LoadGraphics()
-                        grid.Sprite = spriteToUse
+                            for rock = 1, #rockanimations do
+                                if grid.Sprite:IsPlaying(rockanimations[rock]) or grid.Sprite:IsFinished(rockanimations[rock]) then
+                                    spriteToUse:SetFrame(rockanimations[rock], grid.Sprite:GetFrame())
+                                end
+                            end
+
+                            spriteToUse:LoadGraphics()
+                            grid.Sprite = spriteToUse
+                        end
                     end
                 end
             end
@@ -703,6 +757,7 @@ function StageAPI.ChangeDoors(FileNameDoor, sprite)
                 if room:GetType() == RoomType.ROOM_DEFAULT or room:GetType() == RoomType.ROOM_MINIBOSS or room:GetType() == RoomType.ROOM_SACRIFICE then
                     if door.TargetRoomType == RoomType.ROOM_DEFAULT or door.TargetRoomType == RoomType.ROOM_MINIBOSS or door.TargetRoomType == RoomType.ROOM_SACRIFICE then
                         sprite.Rotation = i*90-90
+                        sprite:Play("Close")
                         door.Sprite = sprite
                     end
                 end
@@ -881,6 +936,8 @@ function StageAPI.InNewStage()
     return (stage == LevelStage.STAGE2_1 or stage == LevelStage.STAGE2_2) and AlphaAPI.GAME_STATE.LEVEL:GetStageType() == StageType.STAGETYPE_WOTL
 end
 
+local roomsCleared = {}
+
 function stageAPIMod:SettingUpStage1()
     for _, overlay in ipairs(CUSTOM_OVERLAYS) do
         overlay.Sprite:Update()
@@ -891,6 +948,12 @@ function stageAPIMod:SettingUpStage1()
 	local room = AlphaAPI.GAME_STATE.ROOM
 	local level = AlphaAPI.GAME_STATE.LEVEL
     local curStage = stageProgression.Current
+
+    local roomIndex = level:GetCurrentRoomIndex()
+
+    if room:IsClear() and not roomsCleared[roomIndex] then
+        roomsCleared[roomIndex] = true
+    end
 
 	for _, grid in ipairs(AlphaAPI.entities.grid) do
 		if grid:ToPit() ~= nil and grid.State == 1 and not (grid.Sprite:IsOverlayPlaying("Bridge") or grid.Sprite:IsOverlayFinished("Bridge")) then
@@ -910,7 +973,6 @@ local wait = 0
 local trapdoorFound
 
 function stageAPIMod:SettingUpStage2()
-    stageProgression.Next = catacombs_stage
     for _, player in ipairs(AlphaAPI.GAME_STATE.PLAYERS) do
         if stageProgression.Next then
             local sprite = player:GetSprite()
@@ -1059,18 +1121,26 @@ function stageAPIMod:OnNewRoom()
                 StageAPI.ChangeDoors(curStage.DOORS or "gfx/grid/door_01_normaldoor.png")
 
     			if room:IsFirstVisit() and room:GetType() == RoomType.ROOM_DEFAULT then
+                    StageAPI.ClearRoomLayout()
     				StageAPI.ChangeRoomLayout(curStage.ROOMS)
+                elseif not (level:GetCurrentRoomIndex() == level:GetStartingRoomIndex()) and not roomsCleared[level:GetCurrentRoomIndex()] and room:GetType() == RoomType.ROOM_DEFAULT then
+                    StageAPI.ChangeRoomLayout(curStage.ROOMS, nil, true)
     			end
 
                 StageAPI.ChangeGridEnts(curStage.ROCKS, curStage.PITS, curStage.DECORATION)
     		end
         end
 
-        if room:IsFirstVisit() and room:GetType() == RoomType.ROOM_BOSS then
+        if room:GetType() == RoomType.ROOM_BOSS then
             local ents_spawned
             if curStage.BOSSROOMS then
-                StageAPI.ClearRoomLayout()
-                ents_spawned = StageAPI.ChangeRoomLayout( curStage.BOSSROOMS or catacombs_boss_rooms )
+                if room:IsFirstVisit() then
+                    StageAPI.ClearRoomLayout()
+                    ents_spawned = StageAPI.ChangeRoomLayout( curStage.BOSSROOMS or catacombs_boss_rooms )
+                elseif not roomsCleared[level:GetCurrentRoomIndex()] then
+                    StageAPI.ClearRoomLayout(true)
+                    ents_spawned = StageAPI.ChangeRoomLayout( curStage.BOSSROOMS or catacombs_boss_rooms, nil, true)
+                end
             end
 
             if ents_spawned then
