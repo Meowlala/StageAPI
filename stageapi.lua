@@ -39,6 +39,9 @@ rock_sprite:Load("gfx/grid/grid_rock.anm2", true)
 local pit_sprite = Sprite()
 pit_sprite:Load("stageapi/pit.anm2", true)
 
+local bridge_sprite = Sprite()
+bridge_sprite:Load("stageapi/pit.anm2", true)
+
 local decoration_sprite = Sprite()
 decoration_sprite:Load("gfx/grid/props_03_caves.anm2", true)
 
@@ -810,6 +813,8 @@ function StageAPI.ChangeDoors(FileNameDoor, sprite)
             sprite:ReplaceSpritesheet(i, FileNameDoor)
         end
 
+        sprite:LoadGraphics()
+
         for i=0, DoorSlot.NUM_DOOR_SLOTS-1 do
             local door = room:GetDoor(i)
             if door then
@@ -845,6 +850,8 @@ function StageAPI.ChangeSecretDoors(FileNameDoor, sprite)
         for i = 0, 4 do
             sprite:ReplaceSpritesheet(i, FileNameDoor)
         end
+
+        sprite:LoadGraphics()
 
         for i=0, DoorSlot.NUM_DOOR_SLOTS-1 do
             local door = room:GetDoor(i)
@@ -1057,13 +1064,13 @@ function stageAPIMod:SettingUpStage1()
         end
 
     	for _, grid in ipairs(AlphaAPI.entities.grid) do
-    		if grid:ToPit() ~= nil and grid.State == 1 and not (grid.Sprite:IsOverlayPlaying("Bridge") or grid.Sprite:IsOverlayFinished("Bridge")) then
-    			pit_sprite:ReplaceSpritesheet(0, curStage.PITS)
-    			pit_sprite:SetFrame("pit", grid.Sprite:GetFrame())
-    			pit_sprite:ReplaceSpritesheet(1, curStage.BRIDGES)
-    			pit_sprite:SetOverlayFrame("Bridge", 0)
-    			pit_sprite:LoadGraphics()
-    			grid.Sprite = pit_sprite
+    		if grid:ToPit() and grid.State == 1 and not (grid.Sprite:IsOverlayPlaying("Bridge") or grid.Sprite:IsOverlayFinished("Bridge")) then
+    			bridge_sprite:ReplaceSpritesheet(0, curStage.PITS)
+    			bridge_sprite:SetFrame("pit", grid.Sprite:GetFrame())
+    			bridge_sprite:ReplaceSpritesheet(1, curStage.BRIDGES)
+    			bridge_sprite:SetOverlayFrame("Bridge", 0)
+    			bridge_sprite:LoadGraphics()
+    			grid.Sprite = bridge_sprite
     		end
     	end
     end
@@ -1305,6 +1312,7 @@ function stageAPIMod:OnNewLevel()
 
         StageAPI.ChangeBackdrop(stageProgression.Current.BACKDROPS, stageProgression.Current.BACKDROPANM2)
         StageAPI.ChangeDoors(stageProgression.Current.DOORS or "gfx/grid/door_01_normaldoor.png")
+        StageAPI.ChangeSecretDoors(stageProgression.Current.SECRETDOORS or "gfx/grid/door_01_normaldoor.png")
 	end
 end
 
