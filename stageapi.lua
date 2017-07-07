@@ -45,6 +45,9 @@ decoration_sprite:Load("gfx/grid/props_03_caves.anm2", true)
 local door_sprite = Sprite()
 door_sprite:Load("gfx/grid/door_01_normaldoor.anm2", true)
 
+local secret_door_sprite = Sprite()
+secret_door_sprite:Load("gfx/grid/door_08_holeinwall.anm2", true)
+
 local rockanimations = {"normal", "black", "tinted", "alt", "bombrock", "big", "superspecial", "ss_broken"}
 
 local function VectorToGrid(x,y)
@@ -268,6 +271,15 @@ function StageObject:SetDoors(sheet, anm2)
     self.DOORS = sheet
 end
 
+function StageObject:SetSecretDoors(sheet, anm2)
+    if anm2 then
+        self.SECRETDOORSPRITE = Sprite()
+        self.SECRETDOORSPRITE:Load(anm2, true)
+    end
+
+    self.SECRETDOORS = sheet
+end
+
 function StageObject:SetTransitionIcon(path)
     self.TRANSITIONICON = path
 end
@@ -306,32 +318,54 @@ end
 local backdrop_filenames = {
     {
         {
-            "stageapi/backdrop/Catacombs1_nfloor.png"
+            "stageapi/backdrop/Catacombs/Catacombs1_nfloor.png"
         },
         {
-            "stageapi/backdrop/Catacombs1_lfloor.png"
+            "stageapi/backdrop/Catacombs/Catacombs1_lfloor.png"
         },
         {
-            "stageapi/backdrop/Catacombs1_corner.png"
+            "stageapi/backdrop/Catacombs/Catacombs1_corner.png"
         },
         {
-            "stageapi/backdrop/Catacombs1_1.png",
-            "stageapi/backdrop/Catacombs1_2.png"
+            "stageapi/backdrop/Catacombs/Catacombs1_1.png",
+            "stageapi/backdrop/Catacombs/Catacombs1_2.png"
         }
     },
     {
         {
-            "stageapi/backdrop/Catacombs2_nfloor.png"
+            "stageapi/backdrop/Catacombs/Catacombs2_nfloor.png"
         },
         {
-            "stageapi/backdrop/Catacombs2_lfloor.png"
+            "stageapi/backdrop/Catacombs/Catacombs2_lfloor.png"
         },
         {
-            "stageapi/backdrop/Catacombs2_corner.png"
+            "stageapi/backdrop/Catacombs/Catacombs2_corner.png"
         },
         {
-            "stageapi/backdrop/Catacombs2_1.png",
-            "stageapi/backdrop/Catacombs2_2.png"
+            "stageapi/backdrop/Catacombs/Catacombs2_1.png",
+            "stageapi/backdrop/Catacombs/Catacombs2_2.png"
+        }
+    }
+}
+
+local utero_backdrop = {
+    {
+        NFLOORS = {
+            "stageapi/backdrop/Utero/Utero_nfloor.png"
+        },
+        LFLOORS = {
+            "stageapi/backdrop/Utero/Utero_lfloor.png"
+        },
+        CORNERS = {
+            "stageapi/backdrop/Utero/Utero_corner.png"
+        },
+        WALLS = {
+            "stageapi/backdrop/Utero/Utero_1.png",
+            "stageapi/backdrop/Utero/Utero_2.png",
+            "stageapi/backdrop/Utero/Utero_3.png",
+            "stageapi/backdrop/Utero/Utero_4.png",
+            "stageapi/backdrop/Utero/Utero_5.png",
+            "stageapi/backdrop/Utero/Utero_6.png"
         }
     }
 }
@@ -339,20 +373,28 @@ local backdrop_filenames = {
 local catacomb_rooms = require("catacombs.lua")
 local catacomb_boss_rooms = require("catacombsbosses.lua")
 local catacombs_stage = StageAPI.GetStageConfig("Catacombs", catacomb_rooms, catacomb_boss_rooms, false)
-
 catacombs_stage:UseDefaultRockReplaceChances()
 catacombs_stage:SetTransitionIcon("stageapi/LevelIcon.png")
-
 catacombs_stage:SetNameSprite("stageapi/effect_catacombs1_streak.png", "stageapi/effect_catacombs2_streak.png")
 catacombs_stage:SetBackdrop(getBackdropData(backdrop_filenames))
-
 catacombs_stage:SetBridges("gfx/grid/grid_bridge_catacombs.png")
 catacombs_stage:SetPits("gfx/grid/grid_pit_catacombs.png")
 catacombs_stage:SetRocks("gfx/grid/rocks_catacombs.png")
-
 catacombs_stage:SetMusic(Music.MUSIC_CATACOMBS)
-
 catacombs_stage:SetBossSpot("gfx/ui/boss/bossspot_04_catacombs.png")
+catacombs_stage:SetSecretDoors("gfx/grid/door_08_holeinwall_caves.png")
+
+local utero_stage = StageAPI.GetStageConfig("Utero", catacomb_rooms, catacomb_boss_rooms, false)
+utero_stage:UseDefaultRockReplaceChances()
+utero_stage:SetBackdrop(utero_backdrop)
+utero_stage:SetDoors("gfx/grid/door_25_diceroomdoor.png")
+utero_stage:SetBridges("gfx/grid/grid_bridge_womb.png")
+utero_stage:SetPits("gfx/grid/grid_pit_womb.png")
+utero_stage:SetRocks("gfx/grid/rocks_womb.png")
+utero_stage:SetDecoration("gfx/grid/props_07_the womb.png", "Prop", "gfx/grid/props_07_the womb.anm2")
+utero_stage:SetMusic(Music.MUSIC_WOMB_UTERO)
+utero_stage:SetBossSpot("gfx/ui/boss/bossspot_07_womb.png")
+utero_stage:SetSecretDoors("gfx/grid/door_08_holeinwall_womb.png")
 
 local bosses = {
     {EntityType.ENTITY_GURGLING, "turdlings", 2},
@@ -394,6 +436,7 @@ local bosses = {
 
 for _, bossdata in ipairs(bosses) do
     catacombs_stage:SetBossPortrait(bossdata[1], "gfx/ui/boss/portrait_" .. bossdata[2] .. ".png", "gfx/ui/boss/bossname_" .. bossdata[2] .. ".png", bossdata[3], bossdata[4])
+    utero_stage:SetBossPortrait(bossdata[1], "gfx/ui/boss/portrait_" .. bossdata[2] .. ".png", "gfx/ui/boss/bossname_" .. bossdata[2] .. ".png", bossdata[3], bossdata[4])
 end
 
 local gridData = {
@@ -746,20 +789,76 @@ function StageAPI.ChangeBackdrop(backdrop_data, anm2)
 	end
 end
 
+local doorAnims = {
+    "Opened",
+    "Closed",
+    "Open",
+    "Close",
+    "Break",
+    "KeyOpen",
+    "KeyClose",
+    "BrokenOpen",
+    "KeyClosed",
+    "GoldenKeyOpen"
+}
+
 function StageAPI.ChangeDoors(FileNameDoor, sprite)
 	local room = AlphaAPI.GAME_STATE.ROOM
     sprite = sprite or stageProgression.Current.DOORSPRITE or door_sprite
     if sprite then
-        sprite:ReplaceSpritesheet(0, FileNameDoor)
+        for i = 0, 4 do
+            sprite:ReplaceSpritesheet(i, FileNameDoor)
+        end
+
         for i=0, DoorSlot.NUM_DOOR_SLOTS-1 do
             local door = room:GetDoor(i)
-            if door ~= nil then
+            if door then
                 if room:GetType() == RoomType.ROOM_DEFAULT or room:GetType() == RoomType.ROOM_MINIBOSS or room:GetType() == RoomType.ROOM_SACRIFICE then
                     if door.TargetRoomType == RoomType.ROOM_DEFAULT or door.TargetRoomType == RoomType.ROOM_MINIBOSS or door.TargetRoomType == RoomType.ROOM_SACRIFICE then
                         sprite.Rotation = i*90-90
-                        sprite:Play("Close")
+
+                        for _, anim in ipairs(doorAnims) do
+                            if door.Sprite:IsPlaying(anim) then
+                                sprite:Play(anim)
+                            end
+                        end
+
                         door.Sprite = sprite
                     end
+                end
+            end
+        end
+    end
+end
+
+local secretDoorAnims = {
+    "Open",
+    "Close",
+    "Hidden",
+    "Opened"
+}
+
+function StageAPI.ChangeSecretDoors(FileNameDoor, sprite)
+    local room = AlphaAPI.GAME_STATE.ROOM
+    sprite = sprite or stageProgression.Current.SECRETDOORSPRITE or secret_door_sprite
+    if sprite then
+        for i = 0, 4 do
+            sprite:ReplaceSpritesheet(i, FileNameDoor)
+        end
+
+        for i=0, DoorSlot.NUM_DOOR_SLOTS-1 do
+            local door = room:GetDoor(i)
+            if door then
+                if door.TargetRoomType == RoomType.ROOM_SECRET or room:GetType() == RoomType.ROOM_SECRET then
+                    sprite.Rotation = i*90-90
+
+                    for _, anim in ipairs(secretDoorAnims) do
+                        if door.Sprite:IsPlaying(anim) then
+                            sprite:Play(anim)
+                        end
+                    end
+
+                    door.Sprite = sprite
                 end
             end
         end
@@ -819,6 +918,8 @@ function StageAPI.ChangeRocks(FileName, sprite)
 end
 
 function StageAPI.ChangeGridEnts(rockFileName, pitFileName, decoData, pitSpriteOverride, rockSpriteOverride, decoSpriteOverride)
+    local room = AlphaAPI.GAME_STATE.ROOM
+    rng:SetSeed(room:GetDecorationSeed(), 0)
     for _, grid in ipairs(AlphaAPI.entities.grid) do
         if grid:ToPit() and pitFileName then
             local spriteToUse = pitSpriteOverride or pit_sprite
@@ -858,7 +959,6 @@ function StageAPI.ChangeGridEnts(rockFileName, pitFileName, decoData, pitSpriteO
             local spriteToUse = decoSpriteOverride or decoData.SPRITE or decoration_sprite
 
             spriteToUse:ReplaceSpritesheet(0, decoData.FILE)
-            rng:SetSeed(room:GetDecorationSeed())
             local rand = random(1,42)
             if rand < 10 then rand = "0"..tostring(rand) end
             spriteToUse:Play(decoData.ANIM..tostring(rand), true)
@@ -951,20 +1051,22 @@ function stageAPIMod:SettingUpStage1()
 
     local roomIndex = level:GetCurrentRoomIndex()
 
-    if room:IsClear() and not roomsCleared[roomIndex] then
-        roomsCleared[roomIndex] = true
-    end
+    if curStage then
+        if room:IsClear() and not roomsCleared[roomIndex] then
+            roomsCleared[roomIndex] = true
+        end
 
-	for _, grid in ipairs(AlphaAPI.entities.grid) do
-		if grid:ToPit() ~= nil and grid.State == 1 and not (grid.Sprite:IsOverlayPlaying("Bridge") or grid.Sprite:IsOverlayFinished("Bridge")) then
-			pit_sprite:ReplaceSpritesheet(0, curStage.PITS)
-			pit_sprite:SetFrame("pit", grid.Sprite:GetFrame())
-			pit_sprite:ReplaceSpritesheet(1, curStage.BRIDGES)
-			pit_sprite:SetOverlayFrame("Bridge", 0)
-			pit_sprite:LoadGraphics()
-			grid.Sprite = pit_sprite
-		end
-	end
+    	for _, grid in ipairs(AlphaAPI.entities.grid) do
+    		if grid:ToPit() ~= nil and grid.State == 1 and not (grid.Sprite:IsOverlayPlaying("Bridge") or grid.Sprite:IsOverlayFinished("Bridge")) then
+    			pit_sprite:ReplaceSpritesheet(0, curStage.PITS)
+    			pit_sprite:SetFrame("pit", grid.Sprite:GetFrame())
+    			pit_sprite:ReplaceSpritesheet(1, curStage.BRIDGES)
+    			pit_sprite:SetOverlayFrame("Bridge", 0)
+    			pit_sprite:LoadGraphics()
+    			grid.Sprite = pit_sprite
+    		end
+    	end
+    end
 end
 
 local music = MusicManager()
@@ -1047,9 +1149,9 @@ function stageAPIMod:SettingUpStage2()
                 transition:Stop()
                 transition:Play("Idle")
 
-                if level:GetStage() == LevelStage.STAGE2_1 and curStage.NAMESPRITE.FLOOR1 ~= nil then
+                if level:GetStage() == LevelStage.STAGE2_1 and curStage.NAMESPRITE and curStage.NAMESPRITE.FLOOR1 then
                     namestreak:ReplaceSpritesheet(0, curStage.NAMESPRITE.FLOOR1)
-                elseif level:GetStage() == LevelStage.STAGE2_2 and curStage.NAMESPRITE.FLOOR2 ~= nil then
+                elseif level:GetStage() == LevelStage.STAGE2_2 and curStage.NAMESPRITE and curStage.NAMESPRITE.FLOOR2 then
                     namestreak:ReplaceSpritesheet(0, curStage.NAMESPRITE.FLOOR2)
                 end
 
@@ -1119,6 +1221,7 @@ function stageAPIMod:OnNewRoom()
     			end
 
                 StageAPI.ChangeDoors(curStage.DOORS or "gfx/grid/door_01_normaldoor.png")
+                StageAPI.ChangeSecretDoors(curStage.SECRETDOORS or "gfx/grid/door_08_holeinwall.png")
 
     			if room:IsFirstVisit() and room:GetType() == RoomType.ROOM_DEFAULT then
                     StageAPI.ClearRoomLayout()
@@ -1210,7 +1313,7 @@ function stageAPIMod:ExecuteCommand(command, params)
         local moved = false
         for _, stage in pairs(STAGES) do
             if string.lower(stage.NAME) == string.lower(params) then
-                stage:moveToStage()
+                stage:MoveToStage()
                 Isaac.ConsoleOutput("Moving to stage " .. stage.NAME)
                 moved = true
                 wait = 60
