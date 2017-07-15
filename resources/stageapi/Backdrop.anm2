@@ -2,10 +2,10 @@
 	<Info CreatedBy="Unknown" CreatedOn="6/30/2017 7:25:29 PM" Version="62" Fps="30"/>
 	<Content>
 		<Spritesheets>
-			<Spritesheet Path="backdrop/Catacombs/Catacombs2_1.png" Id="0"/>
-			<Spritesheet Path="backdrop/Catacombs/Catacombs1_nfloor.png" Id="1"/>
-			<Spritesheet Path="backdrop/Catacombs/Catacombs1_lfloor.png" Id="2"/>
-			<Spritesheet Path="backdrop/Catacombs/Catacombs2_corner.png" Id="3"/>
+			<Spritesheet Path="Backdrop/Catacombs/Catacombs2_1.png" Id="0"/>
+			<Spritesheet Path="Backdrop/Catacombs/Catacombs_nfloor.png" Id="1"/>
+			<Spritesheet Path="Backdrop/Catacombs/Catacombs_lfloor.png" Id="2"/>
+			<Spritesheet Path="Backdrop/Catacombs/Catacombs2_corner.png" Id="3"/>
 		</Spritesheets>
 		<Layers>
 			<Layer Name="bodyupleft" Id="0" SpritesheetId="0"/>

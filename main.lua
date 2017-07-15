@@ -18,7 +18,7 @@
 
 local function start()
     local StageSystemVer = 2.0
-    if not StageAPI or StageSystemVer > StageAPI.Version then require "stageapi" end
+    if not StageAPI or StageSystemVer > StageAPI.Version then require "stageapi2" end
 
     -- Call the "start" function of
     -- mods that loaded before this API
